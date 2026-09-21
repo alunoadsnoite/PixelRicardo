@@ -6,7 +6,9 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.Typeface
-import android.media.ToneGenerator
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.view.Choreographer
 import android.view.MotionEvent
 import android.view.View
@@ -96,6 +98,18 @@ class GameView(private val ctx: Context) : View(ctx) {
     private var bannerTtl = 0f
     private val particles = ArrayList<Particle>()
 
+    // combos & sessão
+    private var catchStreak = 0
+    private var sessionCatch = 0
+    private var nearMissFlash = 0f
+
+    // missão diária
+    private var dailyQuest: QuestDef? = null
+
+    // brilhinhos coletáveis no mapa
+    private val collectibles = HashMap<Pair<Int, Int>, Float>()
+    private var collectTimer = 2f
+
     // scroll de conquistas
     private var achScroll = 0f
 
@@ -131,8 +145,8 @@ class GameView(private val ctx: Context) : View(ctx) {
         textSize = 20f
     }
 
-    private var tone: ToneGenerator? = null
     private var attached = false
+    private var music: MusicBox? = null
     private val rand = Random(System.nanoTime())
 
     // ---- Loop ---- //
@@ -158,8 +172,9 @@ class GameView(private val ctx: Context) : View(ctx) {
     override fun onDetachedFromWindow() {
         attached = false
         persist()
-        tone?.release()
-        tone = null
+        music?.stop()
+        music = null
+        SfxBank.release()
         super.onDetachedFromWindow()
     }
 
@@ -178,10 +193,12 @@ class GameView(private val ctx: Context) : View(ctx) {
     }
 
     private fun loadAll() {
-        tone = ToneGenerator(android.media.AudioManager.STREAM_MUSIC, 60)
-
         save = SaveIO.load(ctx)
         val today = todayStr()
+        SfxBank.muted = !save.soundOn
+        if (save.soundOn && music == null) {
+            music = MusicBox().also { it.start() }
+        }
         if (save.lastDay != today) {
             if (save.lastDay.isEmpty()) {
                 save.streak = 1
@@ -199,6 +216,31 @@ class GameView(private val ctx: Context) : View(ctx) {
         }
         save.playCount++
         persist()
+
+        // bônus do dia (primeira abertura do dia)
+        if (save.lastGiftDay != today) {
+            save.lastGiftDay = today
+            gainCoins(10)
+            banners.addLast("BÔNUS DO DIA! +10 pedrinhas")
+            SfxBank.play(Sounds.GIFT)
+            confetti(160f, 60f)
+        }
+
+        // missão diária
+        val todayLD = java.time.LocalDate.now()
+        if (save.questDate != todayLD.toString()) {
+            save.questDate = todayLD.toString()
+            save.questDone = false
+            save.questCatch = 0
+            save.questCare = 0
+            save.questExplore = 0
+            save.questCollect = 0
+            save.questRare = false
+            save.questCombo = 0
+            save.questElement.clear()
+            persist()
+        }
+        dailyQuest = if (save.questDate.isNotEmpty()) DailyQuests.forDay(java.time.LocalDate.parse(save.questDate)) else null
 
         tileBmp[Tile.TALL] = TileArt.tallGrass()
         tileBmp[Tile.WATER] = TileArt.water()
@@ -259,6 +301,38 @@ class GameView(private val ctx: Context) : View(ctx) {
             }
         }
         map[9][13] = Tile.PATH
+        spawnCollectibles()
+    }
+
+    private fun spawnCollectibles() {
+        collectibles.clear()
+        var placed = 0
+        var tries = 0
+        while (placed < 8 && tries < 250) {
+            tries++
+            val x = 1 + rand.nextInt(MAP_W - 2)
+            val y = 1 + rand.nextInt(MAP_H - 2)
+            if (isBlocked(x, y)) continue
+            if (map[y][x] == Tile.PATH) continue
+            if (abs(x - px.toInt()) < 3 && abs(y - py.toInt()) < 3) continue
+            if (collectibles.containsKey(x to y)) continue
+            collectibles[x to y] = randF() * 6.28f
+            placed++
+        }
+    }
+
+    private fun addCollectible() {
+        var tries = 0
+        while (tries < 60) {
+            tries++
+            val x = 1 + rand.nextInt(MAP_W - 2)
+            val y = 1 + rand.nextInt(MAP_H - 2)
+            if (isBlocked(x, y)) continue
+            if (map[y][x] == Tile.PATH) continue
+            if (collectibles.containsKey(x to y)) continue
+            collectibles[x to y] = randF() * 6.28f
+            return
+        }
     }
 
     private fun renderWorld() {
@@ -310,7 +384,7 @@ class GameView(private val ctx: Context) : View(ctx) {
         }
     }
 
-    private fun spawnMob(): Mob {
+    private fun spawnMob(announceRare: Boolean = true): Mob {
         val sp = Catalog.randomId()
         var m = Mob(sp, 13, 9, false, bob = 0f)
         var tries = 0
@@ -324,6 +398,11 @@ class GameView(private val ctx: Context) : View(ctx) {
             m = Mob(sp, x, y, randF() < 0.10f, bob = 0f)
             break
         }
+        if (m.rare && announceRare) {
+            banners.addLast("✨ Uma dourada brilhou no mapa!")
+            SfxBank.play(Sounds.RARE)
+            confetti(m.tx * TILE + 8f, m.ty * TILE + 8f)
+        }
         return m
     }
 
@@ -336,7 +415,8 @@ class GameView(private val ctx: Context) : View(ctx) {
                 save.unlockedAch.add(a.id)
                 gainCoins(a.reward)
                 banners.addLast("CONQUISTA: ${a.name} (+${a.reward})")
-                tone?.startTone(ToneGenerator.TONE_PROP_BEEP2, 180)
+                SfxBank.play(Sounds.QUEST)
+                confetti(160f, 90f)
                 changed = true
             }
         }
@@ -346,6 +426,78 @@ class GameView(private val ctx: Context) : View(ctx) {
     private fun gainCoins(n: Int) {
         save.coins += n
         save.coinsEarned += n
+    }
+
+    private fun questProgress(q: QuestDef): Pair<Int, Int> {
+        val cur = when (q.kind) {
+            QuestKind.CATCH -> save.questCatch
+            QuestKind.CARE -> save.questCare
+            QuestKind.EXPLORE -> save.questExplore
+            QuestKind.COLLECT -> save.questCollect
+            QuestKind.RARE -> if (save.questRare) 1 else 0
+            QuestKind.COMBO -> save.questCombo.coerceAtMost(q.target)
+            QuestKind.ELEMENT -> save.questElement[q.element] ?: 0
+        }
+        return cur to q.target
+    }
+
+    private fun checkQuest() {
+        val q = dailyQuest ?: return
+        if (save.questDone) return
+        if (questProgress(q).first >= q.target) {
+            save.questDone = true
+            gainCoins(q.reward)
+            banners.addLast("MISSÃO DO DIA CONCLUÍDA! (+${q.reward})")
+            SfxBank.play(Sounds.QUEST)
+            confetti(160f, 90f)
+            checkAchievements()
+            persist()
+        }
+    }
+
+    private fun confetti(cx: Float, cy: Float) {
+        for (i in 0 until 14) {
+            val a = i * 0.45f + randF()
+            particles.add(Particle(cx, cy, kotlin.math.cos(a) * 16f, kotlin.math.sin(a) * 16f - 8f, listOf(RGBA_GOLD, RGBA_GREEN, 0xFF9BB3FF.toInt(), 0xFFFF9F6B.toInt())[i % 4], 0.9f))
+        }
+    }
+
+    private fun vibrate(ms: Long) {
+        try {
+            val v = ctx.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator ?: return
+            if (Build.VERSION.SDK_INT >= 26) {
+                v.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                v.vibrate(ms)
+            }
+        } catch (e: Exception) {
+        }
+    }
+
+    private fun toggleSound() {
+        save.soundOn = !save.soundOn
+        SfxBank.muted = !save.soundOn
+        if (save.soundOn) {
+            if (music == null) music = MusicBox().also { it.start() } else music?.start()
+        } else {
+            music?.stop()
+        }
+        persist()
+    }
+
+    private fun comboMult(): Float = when {
+        catchStreak >= 4 -> 3f
+        catchStreak == 3 -> 2f
+        catchStreak == 2 -> 1.5f
+        else -> 1f
+    }
+
+    private fun comboLabel(): String = when {
+        catchStreak >= 4 -> "x3"
+        catchStreak == 3 -> "x2"
+        catchStreak == 2 -> "x1.5"
+        else -> ""
     }
 
     // ---- Dificuldade ---- //
@@ -381,13 +533,15 @@ class GameView(private val ctx: Context) : View(ctx) {
         val needle = needlePos(catch.t, diffPeriod())
         val hit = abs(needle - catch.zone) <= diffTol()
         if (hit) {
+            catchStreak++
+            val combo = comboMult()
+            val coins = (diffCatchCoins(m.rare) * combo).toInt()
             m.alive = false
             save.catchTotal++
             if (!save.caught.containsKey(m.speciesId)) {
                 save.caught[m.speciesId] = CreatureState()
             }
             if (m.rare && !save.caughtRare) save.caughtRare = true
-            val coins = diffCatchCoins(m.rare)
             gainCoins(coins)
             val cx = m.tx * TILE + 8f
             val cy = m.ty * TILE + 8f
@@ -397,28 +551,84 @@ class GameView(private val ctx: Context) : View(ctx) {
             }
             floaties.add(FloatText("+$coins pedrinhas!", (m.tx * TILE + 8).toFloat(), (m.ty * TILE).toFloat(), RGBA_GOLD, 1.3f, world = true))
             floaties.add(FloatText("Capturada: ${Catalog.byId[m.speciesId]?.name}!", 20f, 100f, RGBA_GREEN, 1.8f, world = false))
-            tone?.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 150)
+
+            // primeira captura do dia
+            val today = todayStr()
+            if (save.lastCatchDay != today) {
+                save.lastCatchDay = today
+                gainCoins(5)
+                floaties.add(FloatText("Primeira captura do dia! +5", 30f, 130f, RGBA_GOLD, 1.6f, world = false))
+            }
+
+            // bônus a cada 5 capturas na sessão
+            sessionCatch++
+            if (sessionCatch > 0 && sessionCatch % 5 == 0) {
+                gainCoins(5)
+                banners.addLast("$sessionCatch capturas! +5 de bônus")
+            }
+
+            // missão diária
+            val q = dailyQuest
+            if (q != null && !save.questDone) {
+                when (q.kind) {
+                    QuestKind.CATCH -> save.questCatch++
+                    QuestKind.RARE -> if (m.rare) save.questRare = true
+                    QuestKind.COMBO -> if (save.questCombo < catchStreak) save.questCombo = catchStreak
+                    QuestKind.ELEMENT -> {
+                        val el = Catalog.byId[m.speciesId]?.element
+                        if (el != null && el == q.element) save.questElement[el] = (save.questElement[el] ?: 0) + 1
+                    }
+                    else -> Unit
+                }
+            }
+
+            // combo: efeito + som cada vez mais agudo
+            if (catchStreak >= 2) {
+                SfxBank.combo(catchStreak)
+                floaties.add(FloatText("COMBO ${comboLabel()}!", 20f, 118f, RGBA_GOLD, 1.6f, world = false))
+            } else {
+                SfxBank.play(Sounds.CATCH)
+            }
+            if (m.rare) confetti(cx, cy)
+            checkQuest()
             checkAchievements()
         } else {
+            val dist = abs(needle - catch.zone)
+            if (dist > diffTol() && dist < diffTol() * 3f) {
+                nearMissFlash = 0.5f
+                vibrate(30)
+                SfxBank.play(Sounds.NEAR)
+                floaties.add(FloatText("Quase!", 30f, 130f, RGBA_ORANGE, 1.1f, world = false))
+            } else {
+                SfxBank.play(Sounds.MISS)
+            }
             m.fleeT = 1.0f
             m.fleeDx = if (m.tx > px.toInt()) 1 else -1
             floaties.add(FloatText("Fugiu...", (m.tx * TILE + 8).toFloat() - 12f, (m.ty * TILE).toFloat(), RGBA_RED, 1.3f, world = true))
-            tone?.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
+            catchStreak = 0
         }
         persist()
         catch.mob = null
     }
 
     // ---- Cuidados / evolução ---- //
-    private fun nextCareTarget(stage: Int) = if (stage == 0) 60 else 200
+    private fun nextCareTarget(stage: Int) = if (stage == 0) 20 else 80
 
     private fun doCare(spId: Int, amount: Int) {
         val st = save.caught[spId] ?: return
         st.care += amount
         save.careTotal += amount
-        if (rand.nextInt(100) < 25) {
-            gainCoins(1)
+        if (dailyQuest?.kind == QuestKind.CARE && !save.questDone) save.questCare++
+        // recompensa variável: piso garantido + chance de jackpot
+        gainCoins(1)
+        if (rand.nextInt(100) < 8) {
+            gainCoins(10)
+            floaties.add(FloatText("+10 surpresa de amor!", 30f, 130f, RGBA_GOLD, 1.8f, world = false))
+            SfxBank.play(Sounds.JACKPOT)
+            confetti(160f, 130f)
+        } else if (rand.nextInt(100) < 40) {
             floaties.add(FloatText("+1 pedrinha de amor!", 30f, 130f, RGBA_GOLD, 1.2f, world = false))
+            SfxBank.play(Sounds.COLLECT)
         }
         val target = nextCareTarget(st.stage)
         if (st.stage < 2 && st.care >= target) {
@@ -429,29 +639,42 @@ class GameView(private val ctx: Context) : View(ctx) {
             evoFlash = 1.8f
             evoSpecies = spId
             banners.addLast("${Catalog.byId[spId]!!.name} evoluiu! nivel ${st.stage + 1}")
-            tone?.startTone(ToneGenerator.TONE_CDMA_PIP, 250)
+            SfxBank.play(Sounds.EVOLVE)
+            confetti(160f, 110f)
         }
+        checkQuest()
         checkAchievements()
         persist()
     }
 
     // ---- Loja ---- //
+    private fun skinPrice(s: SkinDef): Int {
+        val first = save.ownedSkins.size <= 1
+        return if (first) (s.price / 2).coerceAtLeast(1) else s.price
+    }
+
     private fun buySkin(id: Int) {
         val s = Skins.byId[id] ?: return
         if (id in save.ownedSkins) {
             save.skin = id
             playerFrames = PlayerArt.render(s)
-            persist()
-        } else if (save.coins >= s.price) {
-            save.coins -= s.price
-            save.ownedSkins.add(id)
-            save.skin = id
-            playerFrames = PlayerArt.render(s)
-            floaties.add(FloatText("Novo visual: ${s.name}!", 30f, 130f, RGBA_GREEN, 1.6f, world = false))
-            checkAchievements()
+            SfxBank.play(Sounds.COLLECT)
             persist()
         } else {
-            floaties.add(FloatText("Pedrinhas insuficientes!", 30f, 130f, RGBA_RED, 1.6f, world = false))
+            val price = skinPrice(s)
+            if (save.coins >= price) {
+                save.coins -= price
+                save.ownedSkins.add(id)
+                save.skin = id
+                playerFrames = PlayerArt.render(s)
+                floaties.add(FloatText("Novo visual: ${s.name}!", 30f, 130f, RGBA_GREEN, 1.6f, world = false))
+                SfxBank.play(Sounds.JACKPOT)
+                checkAchievements()
+                persist()
+            } else {
+                floaties.add(FloatText("Pedrinhas insuficientes!", 30f, 130f, RGBA_RED, 1.6f, world = false))
+                SfxBank.play(Sounds.MISS)
+            }
         }
     }
 
@@ -483,6 +706,14 @@ class GameView(private val ctx: Context) : View(ctx) {
             if (bannerTtl <= 0f) banners.removeFirstOrNull()
         } else if (banners.isNotEmpty()) {
             bannerTtl = 2.7f
+        }
+
+        if (nearMissFlash > 0f) nearMissFlash -= dt
+
+        collectTimer -= dt
+        if (collectTimer <= 0f && collectibles.size < 8) {
+            collectTimer = 4f
+            addCollectible()
         }
 
         refreshMobs(forceAll = false, dt = dt)
@@ -538,8 +769,29 @@ class GameView(private val ctx: Context) : View(ctx) {
         val k = tileKey(px.toInt(), py.toInt())
         if (k != lastTileKey) {
             lastTileKey = k
-            save.visited.add(k)
-            checkAchievements()
+            if (save.visited.add(k)) {
+                gainCoins(1)
+                if (dailyQuest?.kind == QuestKind.EXPLORE && !save.questDone) {
+                    save.questExplore++
+                    checkQuest()
+                }
+                checkAchievements()
+            }
+            // brilhinho coletado ao pisar no tile
+            val tileKeyPair = px.toInt() to py.toInt()
+            if (collectibles.remove(tileKeyPair) != null) {
+                val cc = 2 + rand.nextInt(2)
+                gainCoins(cc)
+                SfxBank.play(Sounds.COLLECT)
+                val ex = tileKeyPair.first * TILE + 8f
+                val ey = tileKeyPair.second * TILE + 8f
+                confetti(ex, ey)
+                floaties.add(FloatText("+$cc pedrinhas!", ex, ey, RGBA_GOLD, 1.4f, world = true))
+                if (dailyQuest?.kind == QuestKind.COLLECT && !save.questDone) {
+                    save.questCollect++
+                    checkQuest()
+                }
+            }
         }
 
         // criaturas
@@ -673,6 +925,12 @@ class GameView(private val ctx: Context) : View(ctx) {
             pText.color = RGBA_GREEN
             c.drawText(go, (320f - pText.measureText(go)) / 2f, 206f + midY, pText)
         }
+
+        // toggle de som
+        val sl = "SOM: ${if (save.soundOn) "ON" else "OFF"}"
+        drawPanel(c, 260f, 4f, 56f, 16f)
+        pTextSmall.color = if (save.soundOn) RGBA_GREEN else RGBA_GRAY
+        c.drawText(sl, 268f, 15f, pTextSmall)
     }
 
     private fun drawCoinIcon(c: Canvas, x: Float, y: Float) {
@@ -760,6 +1018,20 @@ class GameView(private val ctx: Context) : View(ctx) {
             }
         }
 
+        // brilhinhos coletáveis
+        for ((tile, phase) in collectibles) {
+            val sx = tile.first * TILE + 2f - camX
+            val sy = tile.second * TILE - camY + worldOffY + sin(phase + globalTime * 3f) * 1.5f
+            val vis = ((globalTime * 3f + phase) % 1f) < 0.8f
+            if (!vis) continue
+            val pr = 0xFFF5C542.toInt()
+            pRect.color = pr
+            c.drawRect(sx + 5f, sy, sx + 8f, sy + 3f, pRect)
+            c.drawRect(sx, sy + 5f, sx + 3f, sy + 8f, pRect)
+            c.drawRect(sx + 10f, sy + 5f, sx + 13f, sy + 8f, pRect)
+            c.drawRect(sx + 5f, sy + 10f, sx + 8f, sy + 13f, pRect)
+        }
+
         // player
         val pwx = px * TILE - camX
         val pwy = py * TILE - camY + worldOffY
@@ -786,10 +1058,31 @@ class GameView(private val ctx: Context) : View(ctx) {
             c.drawText(tip, cx - 100f, cy + 14f, pText)
             val n = needlePos(catch.t, diffPeriod())
             val z0 = 50f + catch.zone * 100f
-            pRect.color = RGBA_GREEN
-            c.drawRect(cx - 100f + z0, cy + 18f, cx - 100f + z0 + 28f, cy + 20f, pRect)
+            pRect.color = if (nearMissFlash > 0f) RGBA_ORANGE else RGBA_GREEN
+            val flashW = if (nearMissFlash > 0.25f) 32f else 28f
+            c.drawRect(cx - 100f + z0, cy + 18f, cx - 100f + z0 + flashW, cy + 20f, pRect)
             pRect.color = RGBA_GOLD
             c.drawRect(cx - 100f + n * 100f, cy + 18f, cx - 100f + n * 100f + 3f, cy + 20f, pRect)
+            if (catchStreak >= 2) {
+                val cl = "COMBO ${comboLabel()}"
+                pText.color = RGBA_GOLD
+                c.drawText(cl, (320f - pText.measureText(cl)) / 2f, cy + 26f, pText)
+            }
+        }
+
+        // missão do dia
+        val q = dailyQuest
+        if (q != null) {
+            val (cur, target) = questProgress(q)
+            if (save.questDone) {
+                pTextSmall.color = RGBA_GREEN
+                val done = "Missão do dia: feita! (+${q.reward})"
+                c.drawText(done, 2f, 38f + midY, pTextSmall)
+            } else {
+                pTextSmall.color = RGBA_GOLD
+                val qt = "Missão: ${q.desc} ($cur/$target)"
+                c.drawText(qt, 2f, 38f + midY, pTextSmall)
+            }
         }
 
         drawHud(c)
@@ -994,9 +1287,15 @@ class GameView(private val ctx: Context) : View(ctx) {
                 pTextSmall.color = RGBA_GOLD
                 c.drawText("USAR", x + cellW / 2f - 10f, y + 50f, pTextSmall)
             } else {
+                val price = skinPrice(s)
+                val first = save.ownedSkins.size <= 1
+                if (first && price < s.price) {
+                    pTextSmall.color = RGBA_ORANGE
+                    c.drawText("-50%", x + 2f, y + 22f, pTextSmall)
+                }
                 drawCoinIcon(c, x + 20f, y + 43f)
                 pTextSmall.color = RGBA_TEXT
-                c.drawText("${s.price}", x + 40f, y + 51f, pTextSmall)
+                c.drawText("$price", x + 40f, y + 51f, pTextSmall)
             }
         }
     }
@@ -1072,6 +1371,10 @@ class GameView(private val ctx: Context) : View(ctx) {
         }
         if (scr == Scr.TITLE) {
             val midY = (vh - 240f).coerceAtLeast(0f) / 2f
+            if (y in 4f..20f && x in 260f..316f) {
+                toggleSound()
+                return
+            }
             if (y in (168f + midY)..(186f + midY) && x in 34f..(34f + 3 * 96f)) {
                 val dIdx = ((x - 34f) / 96f).toInt().coerceIn(0, 2)
                 if ((x - 34f) % 96f < 84f) setDifficulty(dIdx)

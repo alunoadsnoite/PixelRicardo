@@ -26,6 +26,11 @@
 - 🏆 **20 conquistas** — colecionadora, cuidadora, exploradora, streak diário, peixinho dourado e mais
 - 💰 **Economia** — pedrinhas para comprar **6 visuais** para o personagem
 - 🔥 **Streak diário** — jogue dias seguidos para provar que é a melhor amiga
+- 🔥 **Sessão viciante (v1.1)** — **combos de captura** (até ×3), **jackpot de amor** (+10 surpresa nos cuidados), **primeira captura do dia**, bônus a cada 5 capturas, **brilhinhos coletáveis** no mapa e recompensas por explorar
+- 📆 **Missão diária** (v1.1) — meta rotativa com recompensa em pedrinhas
+- 🎁 **Bônus do dia** (v1.1) — pacotinho de +10 pedrinhas no primeiro login
+- 🎵 **Música chiptune + efeitos por evento** (v1.1) — trilha e SFX 100% sintetizados em PCM, sem assets
+- ✨ **Aviso de criatura dourada** (v1.1) — efeito e alerta quando uma rara aparece no mapa
 - 🎚️ **3 dificuldades** — Fácil / Médio / Difícil (velocidade da agulha, zona de captura, quantidade de criaturas e recompensas)
 - 💾 **Save automático** — progresso salvo a cada evento e ao sair do jogo
 - 🔉 Efeitos sonoros com tons nativos (sem dependências de áudio)
@@ -111,8 +116,9 @@ app/src/main/kotlin/com/pixelricardo/game/
 
 ## 🗺️ Roadmap / ideias
 
-- [ ] Som ambiente (loop de música chiptune)
-- [ ] Desafios diários com recompensa especial
+- [x] Som ambiente (loop de música chiptune)
+- [x] Desafios diários com recompensa especial
+- [x] Minigames extras de recompensa rápida (combo, jackpot, brilhinhos)
 - [ ] Novas regiões do mapa (praia, vulcão, floresta noturna)
 - [ ] Minigames extras (corrida de criaturas, dança)
 - [ ] Troféu de conquista como adesivo colecionável

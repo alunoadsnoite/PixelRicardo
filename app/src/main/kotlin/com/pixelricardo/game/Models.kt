@@ -95,6 +95,36 @@ object Achievements {
     }
 }
 
+enum class QuestKind { CATCH, ELEMENT, CARE, EXPLORE, COLLECT, RARE, COMBO }
+
+data class QuestDef(
+    val id: Int,
+    val desc: String,
+    val kind: QuestKind,
+    val target: Int,
+    val element: String?,
+    val reward: Int
+)
+
+object DailyQuests {
+    private val ELEMENTS = listOf("Fogo", "Água", "Planta", "Elétrico", "Terra", "Ar", "Fada")
+
+    fun forDay(date: java.time.LocalDate): QuestDef {
+        val d = date.toEpochDay().toInt()
+        val el = ELEMENTS[Math.floorMod(d / 3, ELEMENTS.size)]
+        val pool = 7
+        return when (Math.floorMod(d, pool)) {
+            0 -> QuestDef(0, "Capture 5 criaturas", QuestKind.CATCH, 5, null, 15)
+            1 -> QuestDef(1, "Faça 15 cuidados", QuestKind.CARE, 15, null, 12)
+            2 -> QuestDef(2, "Visite 8 lugares novos", QuestKind.EXPLORE, 8, null, 12)
+            3 -> QuestDef(3, "Pegue 5 brilhinhos", QuestKind.COLLECT, 5, null, 12)
+            4 -> QuestDef(4, "Capture uma criatura dourada", QuestKind.RARE, 1, null, 25)
+            5 -> QuestDef(5, "Alcance combo de 3 capturas", QuestKind.COMBO, 3, null, 20)
+            else -> QuestDef(6, "Capture 3 criaturas de $el", QuestKind.ELEMENT, 3, el, 18)
+        }
+    }
+}
+
 class SaveData {
     var coins = 0
     var coinsEarned = 0
@@ -103,6 +133,7 @@ class SaveData {
     var playCount = 0
     var difficulty = 1
     var skin = 0
+    var soundOn = true
     val ownedSkins = mutableSetOf(0)
     val caught = mutableMapOf<Int, CreatureState>()
     val unlockedAch = mutableSetOf<Int>()
@@ -111,6 +142,17 @@ class SaveData {
     var evolveTotal = 0
     val visited = mutableSetOf<String>()
     var caughtRare = false
+    var lastGiftDay = ""
+    var lastCatchDay = ""
+    var questDate = ""
+    var questDone = false
+    var questCatch = 0
+    var questCare = 0
+    var questExplore = 0
+    var questCollect = 0
+    var questRare = false
+    var questCombo = 0
+    val questElement = mutableMapOf<String, Int>()
 
     fun toJson(): String {
         val o = JSONObject()
@@ -121,6 +163,7 @@ class SaveData {
         o.put("playCount", playCount)
         o.put("difficulty", difficulty)
         o.put("skin", skin)
+        o.put("soundOn", soundOn)
         o.put("ownedSkins", JSONArray(ownedSkins.toList()))
         val ca = JSONObject()
         caught.forEach { (k, v) ->
@@ -136,6 +179,19 @@ class SaveData {
         o.put("evolveTotal", evolveTotal)
         o.put("visited", JSONArray(visited.toList()))
         o.put("caughtRare", caughtRare)
+        o.put("lastGiftDay", lastGiftDay)
+        o.put("lastCatchDay", lastCatchDay)
+        o.put("questDate", questDate)
+        o.put("questDone", questDone)
+        o.put("questCatch", questCatch)
+        o.put("questCare", questCare)
+        o.put("questExplore", questExplore)
+        o.put("questCollect", questCollect)
+        o.put("questRare", questRare)
+        o.put("questCombo", questCombo)
+        val qe = JSONObject()
+        questElement.forEach { (k, v) -> qe.put(k, v) }
+        o.put("questElement", qe)
         return o.toString()
     }
 
@@ -169,6 +225,25 @@ class SaveData {
             val v = o.optJSONArray("visited")
             if (v != null) for (i in 0 until v.length()) d.visited.add(v.getString(i))
             d.caughtRare = o.optBoolean("caughtRare", false)
+            d.soundOn = o.optBoolean("soundOn", true)
+            d.lastGiftDay = o.optString("lastGiftDay", "")
+            d.lastCatchDay = o.optString("lastCatchDay", "")
+            d.questDate = o.optString("questDate", "")
+            d.questDone = o.optBoolean("questDone", false)
+            d.questCatch = o.optInt("questCatch", 0)
+            d.questCare = o.optInt("questCare", 0)
+            d.questExplore = o.optInt("questExplore", 0)
+            d.questCollect = o.optInt("questCollect", 0)
+            d.questRare = o.optBoolean("questRare", false)
+            d.questCombo = o.optInt("questCombo", 0)
+            val qe = o.optJSONObject("questElement")
+            if (qe != null) {
+                val it = qe.keys()
+                while (it.hasNext()) {
+                    val k = it.next()
+                    d.questElement[k] = qe.getInt(k)
+                }
+            }
             return d
         }
     }
@@ -186,11 +261,11 @@ data class SkinDef(
 object Skins {
     val LIST = listOf(
         SkinDef(0, "Aventureira", 0, 0xFFD94B4B.toInt(), 0xFF3D4A63.toInt(), 0xFFB57B4F.toInt()),
-        SkinDef(1, "Capitã do Mar", 20, 0xFF2E4A8F.toInt(), 0xFFFFFFFF.toInt(), 0xFFB57B4F.toInt()),
-        SkinDef(2, "Estrelinha", 25, 0xFF7A4FA8.toInt(), 0xFFB09A3C.toInt(), 0xFFB57B4F.toInt()),
-        SkinDef(3, "Aventureira Verde", 30, 0xFF3E8F4F.toInt(), 0xFF6B4A2E.toInt(), 0xFF8A5A30.toInt()),
-        SkinDef(4, "Rainha das Sombras", 40, 0xFF2B2B35.toInt(), 0xFF8E44AD.toInt(), 0xFFE7E7EE.toInt()),
-        SkinDef(5, "Princesa dos Pixels", 60, 0xFFE86AA6.toInt(), 0xFFFFE97A.toInt(), 0xFFE7AA3C.toInt()),
+        SkinDef(1, "Capitã do Mar", 12, 0xFF2E4A8F.toInt(), 0xFFFFFFFF.toInt(), 0xFFB57B4F.toInt()),
+        SkinDef(2, "Estrelinha", 15, 0xFF7A4FA8.toInt(), 0xFFB09A3C.toInt(), 0xFFB57B4F.toInt()),
+        SkinDef(3, "Aventureira Verde", 18, 0xFF3E8F4F.toInt(), 0xFF6B4A2E.toInt(), 0xFF8A5A30.toInt()),
+        SkinDef(4, "Rainha das Sombras", 24, 0xFF2B2B35.toInt(), 0xFF8E44AD.toInt(), 0xFFE7E7EE.toInt()),
+        SkinDef(5, "Princesa dos Pixels", 36, 0xFFE86AA6.toInt(), 0xFFFFE97A.toInt(), 0xFFE7AA3C.toInt()),
     )
     val byId = LIST.associateBy { it.id }
 }
