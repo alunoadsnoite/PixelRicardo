@@ -1,0 +1,24 @@
+# Build
+.gradle/
+build/
+.kotlin/
+
+# Config local (caminho do SDK)
+local.properties
+keystore.properties
+
+# APKs / artefatos de build
+*.apk
+*.aab
+Downloads/
+
+# Segredos: NUNCA subir keystore
+keystores/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
