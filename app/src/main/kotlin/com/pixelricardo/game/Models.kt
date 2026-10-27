@@ -275,19 +275,29 @@ object SaveIO {
         File(context.filesDir, "pixelricardo_save.json")
 
     fun load(context: android.content.Context): SaveData {
-        val f = file(context)
-        return if (f.exists()) {
-            try {
-                SaveData.fromJson(f.readText())
-            } catch (e: Exception) {
-                SaveData()
-            }
-        } else SaveData()
+        return try {
+            val atomic = android.util.AtomicFile(file(context))
+            SaveData.fromJson(atomic.openRead().bufferedReader().use { it.readText() })
+        } catch (_: Exception) {
+            SaveData()
+        }
+    }
+
+    fun persistChecked(context: android.content.Context, d: SaveData) {
+        val atomic = android.util.AtomicFile(file(context))
+        val output = atomic.startWrite()
+        try {
+            output.write(d.toJson().toByteArray(Charsets.UTF_8))
+            atomic.finishWrite(output)
+        } catch (error: Exception) {
+            atomic.failWrite(output)
+            throw error
+        }
     }
 
     fun persist(context: android.content.Context, d: SaveData) {
         try {
-            file(context).writeText(d.toJson())
+            persistChecked(context, d)
         } catch (e: Exception) {
         }
     }
