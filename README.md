@@ -43,6 +43,18 @@ No Android, toque no arquivo e permita **"fontes desconhecidas"** se necessário
 
 > Suporte: Android 8.0+ (API 26+), retrato, touch.
 
+## 💾 Exportar e importar progresso
+
+Na tela inicial, toque em **BACKUP** (canto superior esquerdo).
+
+- **Exportar:** escolha onde salvar o arquivo JSON pelo seletor do Android. Guarde-o fora da pasta privada do aplicativo, por exemplo em Documentos ou em outro aparelho.
+- **Importar:** selecione um backup exportado pelo jogo. Confira o resumo de espécies e pedrinhas e confirme **Substituir**. Exporte o progresso atual primeiro se quiser preservá-lo.
+- Cancelar a seleção ou a confirmação não importa dados. Arquivos inválidos, de outro aplicativo, de formato incompatível ou maiores que 1 MiB são recusados.
+
+O backup inclui criaturas e evoluções, pedrinhas, visuais, conquistas, exploração, dificuldade, som e os dados da missão diária. Ao importar, valem as regras normais da abertura do jogo, incluindo a mudança de dia. O arquivo não é criptografado; escolha onde guardá-lo.
+
+**Limite da versão 1.0:** a chave de assinatura dessa versão foi perdida. A nova versão não pode ser instalada sobre ela para adicionar o botão de backup. Este recurso não recupera automaticamente saves de instalações antigas sem exportação. Não desinstale a 1.0 se ainda precisar do progresso: remover o app pode apagá-lo. A migração exige primeiro obter o save antigo por um meio de backup já disponível nesse aparelho; o importador aceita apenas o formato de backup exportado por este recurso.
+
 ## 🛠️ Compilar do zero
 
 Requisitos:

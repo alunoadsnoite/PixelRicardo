@@ -19,7 +19,7 @@ import kotlin.random.Random
 
 private const val TILE = 16
 
-class GameView(private val ctx: Context) : View(ctx) {
+class GameView(private val ctx: Context, private val openBackup: () -> Unit = {}) : View(ctx) {
 
     private enum class Scr { TITLE, WORLD, DEX, ACH, SHOP }
 
@@ -264,6 +264,22 @@ class GameView(private val ctx: Context) : View(ctx) {
     }
 
     fun persistNow() = persist()
+
+    fun backupData(): String = Backup.encode(save)
+
+    fun restoreBackup(data: SaveData) {
+        SaveIO.persistChecked(ctx, data)
+        save = data
+        scr = Scr.TITLE
+        selectedSpecies = null
+        catch.mob = null
+        banners.clear()
+        bannerTtl = 0f
+        music?.stop()
+        music = null
+        loadAll()
+        invalidate()
+    }
 
     // ---- Mundo ---- //
     private fun isBlocked(x: Int, y: Int): Boolean {
@@ -926,6 +942,10 @@ class GameView(private val ctx: Context) : View(ctx) {
             c.drawText(go, (320f - pText.measureText(go)) / 2f, 206f + midY, pText)
         }
 
+        drawPanel(c, 4f, 4f, 68f, 20f)
+        pTextSmall.color = RGBA_TEXT
+        c.drawText("BACKUP", 12f, 18f, pTextSmall)
+
         // toggle de som
         val sl = "SOM: ${if (save.soundOn) "ON" else "OFF"}"
         drawPanel(c, 260f, 4f, 56f, 16f)
@@ -1364,6 +1384,10 @@ class GameView(private val ctx: Context) : View(ctx) {
     }
 
     private fun onTap(x: Float, y: Float) {
+        if (scr == Scr.TITLE && y in 4f..24f && x in 4f..72f) {
+            openBackup()
+            return
+        }
         if (bannerTtl > 0f) {
             bannerTtl = 0f
             banners.removeFirstOrNull()
