@@ -55,6 +55,8 @@ O backup inclui criaturas e evoluções, pedrinhas, visuais, conquistas, explora
 
 **Limite da versão 1.0:** a chave de assinatura dessa versão foi perdida. A nova versão não pode ser instalada sobre ela para adicionar o botão de backup. Este recurso não recupera automaticamente saves de instalações antigas sem exportação. Não desinstale a 1.0 se ainda precisar do progresso: remover o app pode apagá-lo. A migração exige primeiro obter o save antigo por um meio de backup já disponível nesse aparelho; o importador aceita apenas o formato de backup exportado por este recurso.
 
+O [teste no Motorola/Android 17](docs/BACKUP-DEVICE-TEST.md) confirmou exportação, rejeição de arquivo incompatível, cancelamento, restauração e persistência após reabertura em uma cópia isolada.
+
 ## 🛠️ Compilar do zero
 
 Requisitos:
