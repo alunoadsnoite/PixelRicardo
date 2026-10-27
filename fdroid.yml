@@ -1,0 +1,51 @@
+Categories:
+  - Games
+
+License: MIT
+
+Name: PixelRicardo
+
+Summary: |
+  Um mundinho pixel cheio de amiguinhos para capturar, criar e evoluir.
+
+Description: |
+  PixelRicardo é um jogo mobile em Kotlin puro, sem engine e sem assets
+  de imagem — toda a arte é renderizada em pixel-art procedimental.
+
+  Você explora um mundo em blocos, captura criaturas fofas num minijogo
+  de agulha, cuida delas até evoluírem e desbloqueia dezenas de conquistas.
+
+  ## Recursos
+  - Mundo pixel explorável com terreno variado
+  - 24 espécies de criaturas com cores e elementos únicos
+  - Minijogo de captura com criaturas raras douradas
+  - Cuidados: alimente, brinque e escove para aumentar o afeto
+  - 3 estágios de evolução por criatura
+  - 20 conquistas com troféus
+  - Economia de pedrinhas para comprar 6 visuais
+  - Streak diário e missões rotativas
+  - Música chiptune e efeitos 100% sintetizados
+  - Aviso de criatura dourada
+  - 3 dificuldades: Fácil / Médio / Difícil
+  - Save automático e 100% offline
+
+SourceCode: https://github.com/alunoadsnoite/PixelRicardo
+WebSite: https://github.com/alunoadsnoite/PixelRicardo
+IssueTracker: https://github.com/alunoadsnoite/PixelRicardo/issues
+Changelog: https://github.com/alunoadsnoite/PixelRicardo/blob/main/CHANGELOG.md
+
+RepoType: git
+Repo: https://github.com/alunoadsnoite/PixelRicardo.git
+
+Builds:
+  - versionName: '1.1'
+    versionCode: 2
+    commit: v1.1
+    subdir: app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version v%v
+UpdateCheckMode: Tags
+CurrentVersion: '1.1'
+CurrentVersionCode: 2
