@@ -19,7 +19,7 @@ import kotlin.random.Random
 
 private const val TILE = 16
 
-class GameView(private val ctx: Context, private val openBackup: () -> Unit = {}) : View(ctx) {
+class GameView @JvmOverloads constructor(private val ctx: Context, private val openBackup: () -> Unit = {}) : View(ctx) {
 
     private enum class Scr { TITLE, WORLD, DEX, ACH, SHOP }
 
