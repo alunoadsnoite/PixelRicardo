@@ -1,0 +1,7 @@
+PixelRicardo is an offline creature-collecting game with a Brazilian Portuguese interface. Explore a pixel world, catch 24 species, care for creatures and follow their evolutions and achievements.
+
+Includes three difficulty levels, character outfits, daily quests, synthesized music and sound effects. No ads or in-app purchases.
+
+Export and import progress using BACKUP on the title screen. Import replaces current progress after confirmation. Keep backups outside the app before uninstalling.
+
+The interface is Portuguese only. No account or internet connection is required.

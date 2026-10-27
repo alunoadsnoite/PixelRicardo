@@ -1,0 +1,7 @@
+PixelRicardo é um jogo offline em português do Brasil. Explore um mundo em pixels, capture 24 espécies, cuide das criaturas e acompanhe suas evoluções e conquistas.
+
+Inclui três dificuldades, visuais para o personagem, missões diárias, música e efeitos sintetizados. Não contém anúncios nem compras.
+
+Exporte e importe seu progresso pelo botão BACKUP da tela inicial. A importação substitui o progresso atual após confirmação. Guarde o arquivo fora do app antes de desinstalar.
+
+A interface está disponível somente em português. Não exige conta nem conexão à internet.

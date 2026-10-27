@@ -1,0 +1,25 @@
+Categories:
+  - Role-Playing Game
+License: MIT
+AuthorName: Valdenor
+SourceCode: https://github.com/alunoadsnoite/PixelRicardo
+IssueTracker: https://github.com/alunoadsnoite/PixelRicardo/issues
+Changelog: https://github.com/alunoadsnoite/PixelRicardo/releases
+
+AutoName: PixelRicardo
+
+RepoType: git
+Repo: https://github.com/alunoadsnoite/PixelRicardo.git
+
+Builds:
+  - versionName: '1.2'
+    versionCode: 3
+    commit: b8b25e36a66befdde17317eba96c47a6e4634871
+    subdir: app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags ^v[0-9]+\.[0-9]+(\.[0-9]+)?$
+CurrentVersion: '1.2'
+CurrentVersionCode: 3
